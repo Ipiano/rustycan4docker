@@ -12,11 +12,14 @@ sudo modprobe can-gw
 ```
 
 ## Available Options
-**vxcan.id**: Numerical identifier of the host interface (i.e., 0 for can0, or 1 for can1). Default is 0.
 
-**vxcan.dev**: Name of the host CAN interface (excluding numeric identifier). If the device is present (i.e., a physical CAN device) then it will be used as is; otherwise, a virtual CAN interface is created to use. Default is 'vcan'.
+**vxcan.device**: (Replaces `vxcan.dev` and `vxcan.id`) Name of the host CAN interface. If the device is present (i.e., a physical CAN device) then it will be used as is; otherwise, a virtual CAN interface is created to use. Default is 'vcan0'.
 
 **vxcan.peer**: Prefix for the peer device (i.e., endpoint) to use in the container. Default is 'vcanp'. Devices in the container will be enumerated by docker as they are added to the container
+
+**vxcan.dev**: (Deprecated; see `vxcan.device`) Prefix of the host CAN interface. If `vxcan.device` is not specified, it is formed by concatenating `vxcan.dev` and `vxcan.id`
+
+**vxcan.id**: (Deprecated; see `vxcan.device`) Numerical identifier of the host interface (i.e., 0 for can0, or 1 for can1). Default is 0.
 
 ## Usage
 
@@ -27,7 +30,7 @@ docker run --rm -it --name a1 alpine
 docker run --rm -it --name a2 alpine
 
 # Create the network
-docker network create --driver ngpbach/rustycan4docker:latest -o vxcan.dev=vcan -o vxcan.id=0 -o vxcan.peer=vxcanp rust_can1
+docker network create --driver ngpbach/rustycan4docker:latest -o vxcan.device=vcan0 -o vxcan.peer=vxcanp rust_can1
 
 # Connect the network to the containers
 docker network connect rust_can1 a1
@@ -58,8 +61,7 @@ networks:
     driver: ngpbach/rustycan4docker:latest
     driver_opts:
       # Uses or creates `can3` on the host
-      vxcan.dev: can
-      vxcan.id: 3
+      vxcan.device: can3
 
       # Creates `can0` in the containers
       vxcan.peer: can

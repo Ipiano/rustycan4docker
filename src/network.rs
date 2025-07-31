@@ -41,33 +41,30 @@ pub struct JoinResponse {
 pub struct Network {
     device: String,
     peer: String,
-    canid: String,
-    ifc: String,
     created: bool,
     endpoint_list: Arc<RwLock<HashMap<String, Endpoint>>>,
     rules_list: Arc<RwLock<Vec<(String, String)>>>,
 }
 
 impl Network {
-    pub fn new(device: String, peer: String, canid: String) -> Self {
+    pub fn new(device: String, peer: String) -> Self {
         let ifcs = interfaces::Interface::get_all().unwrap();
 
         let mut exists: bool = false;
-        let newifc = format!("{device}{canid}");
 
         for i in ifcs.into_iter() {
-            if i.name.eq(&newifc) {
+            if i.name.eq(&device) {
                 exists = true;
             }
         }
 
         if !exists {
-            println!(" -> Creating interface {newifc}...");
+            println!(" -> Creating interface {device}...");
             std::process::Command::new("ip")
                 .arg("link")
                 .arg("add")
                 .arg("dev")
-                .arg(&newifc)
+                .arg(&device)
                 .arg("type")
                 .arg("vcan")
                 .output()
@@ -76,19 +73,17 @@ impl Network {
                 .arg("link")
                 .arg("set")
                 .arg("up")
-                .arg(&newifc)
+                .arg(&device)
                 .output()
                 .expect(" !! Failed to start VCAN device");
         }
         println!(
-            " -> Creating network with settings: device='{}', peer='{}', id='{}' -- new device? {}",
-            device, peer, canid, !exists
+            " -> Creating network with settings: device='{}', peer='{}' -- new device? {}",
+            device, peer, !exists
         );
         Network {
             device: device,
             peer: peer,
-            canid: canid,
-            ifc: newifc,
             created: !exists,
             endpoint_list: Arc::new(RwLock::new(HashMap::new())),
             rules_list: Arc::new(RwLock::new(Vec::new())),
@@ -117,8 +112,8 @@ impl Network {
         match map.get(&epuid) {
             Some(ep) => {
                 // Add cangw rules: self->endpoint, endpoint->self
-                self.add_cangw_rule(&self.ifc, &ep.device);
-                self.add_cangw_rule(&ep.device, &self.ifc);
+                self.add_cangw_rule(&self.device, &ep.device);
+                self.add_cangw_rule(&ep.device, &self.device);
 
                 for (uid, endpt) in map.iter() {
                     if uid.ne(&epuid) {
@@ -159,8 +154,8 @@ impl Network {
                 }
 
                 // Remove cangw rules: self->endpoint, endpoint->self
-                self.remove_cangw_rule(&ep.device, &self.ifc);
-                self.remove_cangw_rule(&self.ifc, &ep.device);
+                self.remove_cangw_rule(&ep.device, &self.device);
+                self.remove_cangw_rule(&self.device, &ep.device);
             }
             None => (),
         };
@@ -229,29 +224,27 @@ impl Network {
 impl Drop for Network {
     fn drop(&mut self) {
         if self.created {
-            let ifc = format!("{}{}", self.device, self.canid);
-
             // Actually delete the network interface
             std::process::Command::new("ip")
                 .arg("link")
                 .arg("set")
                 .arg("down")
-                .arg(&ifc)
+                .arg(&self.device)
                 .output()
                 .expect(" !! Failed to stop VCAN device");
             std::process::Command::new("ip")
                 .arg("link")
                 .arg("del")
                 .arg("dev")
-                .arg(&ifc)
+                .arg(&self.device)
                 .arg("type")
                 .arg("vcan")
                 .output()
                 .expect(" !! Failed to remove VCAN device");
 
             println!(
-                " -> Dropping network object: device={}, peer={}, id={}",
-                self.device, self.peer, self.canid
+                " -> Dropping network object: device={}, peer={}",
+                self.device, self.peer
             );
         }
     }

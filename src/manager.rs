@@ -68,13 +68,8 @@ impl NetworkManager {
                                 } else {
                                     String::from("vcan")
                                 };
-                                let canid = if options.contains_key("vxcan.id") {
-                                    options["vxcan.id"].clone()
-                                } else {
-                                    String::from("0")
-                                };
 
-                                let nw = Network::new(device, peer, canid);
+                                let nw = Network::new(device, peer);
                                 self.network_list.write().insert(nid, nw);
                             }
                         }
@@ -95,8 +90,8 @@ impl NetworkManager {
         );
 
         match self.options_parse(options) {
-            Ok((d, p, c)) => {
-                let nw = Network::new(d, p, c);
+            Ok((d, p)) => {
+                let nw = Network::new(d, p);
                 self.network_list.write().insert(uid, nw);
             }
             Err(_) => {}
@@ -179,10 +174,10 @@ impl NetworkManager {
         };
     }
 
-    fn options_parse(&self, options: String) -> Result<(String, String, String), Error> {
+    fn options_parse(&self, options: String) -> Result<(String, String), Error> {
         match serde_json::from_str::<serde_json::Value>(&options) {
             Ok(v) => {
-                let device = match v["vxcan.dev"].as_str() {
+                let device_prefix = match v["vxcan.dev"].as_str() {
                     Some(u) => u.to_string(),
                     None => {
                         println!(" !! Error parsing vxcan.dev option: {}", v["vxcan.dev"]);
@@ -203,9 +198,22 @@ impl NetworkManager {
                         String::from("0")
                     }
                 };
+                let device_full = match v["vxcan.device"].as_str() {
+                    Some(u) => u.to_string(),
+                    None => {
+                        println!(" !! Error parsing vxcan.device option: {}", v["vxcan.device"]);
+                        String::new()
+                    }
+                };
+
+                let device_actual = if !device_full.is_empty() {
+                    device_full
+                } else {
+                    format!("{device_prefix}{canid}")
+                };
 
                 // Return the tuple of options
-                Ok((device, peer, canid))
+                Ok((device_actual, peer))
             }
             Err(_) => Err(Error),
         }
